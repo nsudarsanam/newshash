@@ -1,13 +1,15 @@
-"""Use Claude to summarize and categorize newsletter links."""
+"""Use Gemini to summarize and categorize newsletter links."""
 
 import json
 import os
+import re
 
-import anthropic
+import google.generativeai as genai
 
 from gmail_fetcher import NewsletterEmail
 
-client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
+model = genai.GenerativeModel("gemini-3-flash-preview")
 
 SYSTEM_PROMPT = """You are a research assistant that reads newsletter links and identifies genuinely interesting content.
 
@@ -38,8 +40,7 @@ Return a JSON object with this structure:
   ],
   "total_interesting": <number of links you kept>,
   "total_skipped": <number you filtered out>
-}
-"""
+}"""
 
 
 def _build_links_payload(newsletters: list[NewsletterEmail]) -> str:
@@ -62,30 +63,19 @@ def summarize_newsletters(newsletters: list[NewsletterEmail]) -> dict:
     payload = _build_links_payload(newsletters)
     total_links = sum(len(nl.links) for nl in newsletters)
 
-    prompt = f"""Here are {total_links} links extracted from {len(newsletters)} newsletter emails received in the past 7 days.
+    prompt = f"""{SYSTEM_PROMPT}
+
+Here are {total_links} links extracted from {len(newsletters)} newsletter emails received in the past 7 days.
 
 Please identify the interesting ones, group them into categories, and return your analysis as JSON.
 
 Links:
 {payload}"""
 
-    with client.messages.stream(
-        model="claude-opus-4-7",
-        max_tokens=8000,
-        thinking={"type": "adaptive"},
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": prompt}],
-    ) as stream:
-        response = stream.get_final_message()
-
-    # Extract JSON from the response
-    text = next(
-        (block.text for block in response.content if block.type == "text"),
-        "{}"
-    )
+    response = model.generate_content(prompt)
+    text = response.text.strip()
 
     # Strip markdown code fences if present
-    text = text.strip()
     if text.startswith("```"):
         lines = text.splitlines()
         text = "\n".join(lines[1:-1] if lines[-1].startswith("```") else lines[1:])
@@ -93,8 +83,6 @@ Links:
     try:
         return json.loads(text)
     except json.JSONDecodeError:
-        # Try to extract JSON object from mixed text
-        import re
         match = re.search(r'\{.*\}', text, re.DOTALL)
         if match:
             return json.loads(match.group())
