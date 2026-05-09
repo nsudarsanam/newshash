@@ -39,6 +39,16 @@ SKIP_URL_PATTERNS = re.compile(
 
 SKIP_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".svg", ".webp", ".ico", ".pdf"}
 
+# Sender/subject keywords that should always be excluded (case-insensitive substring match)
+EXCLUDED_KEYWORDS = [
+    "eventbrite",
+    "women's prison",
+    "womens prison",
+    "prisoner news",
+    "oakland y ",       # Oakland YMCA / Oakland Y newsletters
+    "ymca of",
+]
+
 
 @dataclass
 class NewsletterEmail:
@@ -127,12 +137,17 @@ def _is_newsletter(headers: dict) -> bool:
     return any(ind in header_block for ind in NEWSLETTER_INDICATORS)
 
 
+def _is_excluded(subject: str, sender: str) -> bool:
+    combined = (subject + " " + sender).lower()
+    return any(kw in combined for kw in EXCLUDED_KEYWORDS)
+
+
 def fetch_newsletters(
     service, days: int = 7, max_results: int = 100, verbose: bool = False
 ) -> list[NewsletterEmail]:
     since = datetime.now(timezone.utc) - timedelta(days=days)
     after_ts = int(since.timestamp())
-    query = f"after:{after_ts} -from:me"
+    query = f"in:inbox -category:promotions after:{after_ts} -from:me"
 
     try:
         response = service.users().messages().list(
@@ -165,6 +180,11 @@ def fetch_newsletters(
         if not _is_newsletter(headers):
             if verbose:
                 print(f"[debug] SKIP (not newsletter): {subject!r} from {sender!r}")
+            continue
+
+        if _is_excluded(subject, sender):
+            if verbose:
+                print(f"[debug] SKIP (excluded): {subject!r} from {sender!r}")
             continue
 
         date_str = headers.get("date", "")
