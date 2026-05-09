@@ -14,7 +14,7 @@ load_dotenv()
 console = Console()
 
 
-def run(days: int = 7, max_emails: int = 100, verbose: bool = False):
+def run(days: int = 7, max_emails: int = 150, verbose: bool = False):
     from auth import get_gmail_service
     from gmail_fetcher import fetch_newsletters
     from summarizer import summarize_newsletters
@@ -73,7 +73,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Summarize newsletter links from Gmail")
     parser.add_argument("--days", type=int, default=7, help="How many days back to look (default: 7)")
-    parser.add_argument("--max-emails", type=int, default=100, help="Max emails to scan (default: 100)")
+    parser.add_argument("--max-emails", type=int, default=150, help="Max emails to scan (default: 150)")
     parser.add_argument("--verbose", action="store_true", help="Show which emails are accepted/skipped")
     args = parser.parse_args()
 
