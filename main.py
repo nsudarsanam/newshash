@@ -18,7 +18,7 @@ def run(days: int = 7, max_emails: int = 150, verbose: bool = False):
     from auth import get_gmail_service
     from gmail_fetcher import fetch_newsletters
     from summarizer import summarize_newsletters
-    from html_report import generate_html
+    from html_report import generate_html, generate_pdf
 
     console.print("[dim]Authenticating with Gmail...[/dim]")
     try:
@@ -53,19 +53,24 @@ def run(days: int = 7, max_emails: int = 150, verbose: bool = False):
 
     html = generate_html(result, newsletter_count=len(newsletters), days=days)
 
-    output_path = Path("digest.html")
-    output_path.write_text(html, encoding="utf-8")
+    html_path = Path("digest.html")
+    html_path.write_text(html, encoding="utf-8")
+
+    console.print("[dim]Generating PDF...[/dim]")
+    pdf_path = Path("digest.pdf")
+    pdf_path.write_bytes(generate_pdf(html))
 
     console.print()
     console.print(Panel.fit(
         f"[bold green]Done![/bold green] "
         f"[bold]{result.get('total_interesting', 0)}[/bold] interesting links "
         f"across [bold]{len(categories)}[/bold] categories.\n"
-        f"[dim]Saved to [cyan]{output_path.resolve()}[/cyan][/dim]",
+        f"[dim]PDF: [cyan]{pdf_path.resolve()}[/cyan][/dim]\n"
+        f"[dim]HTML: [cyan]{html_path.resolve()}[/cyan][/dim]",
         border_style="green",
     ))
 
-    webbrowser.open(output_path.resolve().as_uri())
+    webbrowser.open(pdf_path.resolve().as_uri())
 
 
 if __name__ == "__main__":

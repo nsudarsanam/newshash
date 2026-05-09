@@ -288,6 +288,17 @@ def generate_html(result: dict, newsletter_count: int, days: int) -> str:
             main {{ padding: 24px 16px 60px; }}
             .stats {{ flex-direction: column; gap: 8px; text-align: center; }}
         }}
+
+        /* Print / PDF */
+        @media print {{
+            nav {{ display: none; }}
+            body {{ font-size: 13px; }}
+            header {{ padding: 32px 24px 24px; }}
+            main {{ padding: 24px; }}
+            .card {{ break-inside: avoid; }}
+            .category {{ break-inside: avoid-page; }}
+            .card-title a {{ color: #e2e4f0; }}
+        }}
     </style>
 </head>
 <body>
@@ -310,6 +321,11 @@ def generate_html(result: dict, newsletter_count: int, days: int) -> str:
     <footer>Generated from your Gmail inbox &nbsp;·&nbsp; {generated_at}</footer>
 </body>
 </html>"""
+
+
+def generate_pdf(html: str) -> bytes:
+    from weasyprint import HTML
+    return HTML(string=html).write_pdf()
 
 
 def _esc(text: str) -> str:
