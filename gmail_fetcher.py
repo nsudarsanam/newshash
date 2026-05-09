@@ -143,7 +143,7 @@ def _is_excluded(subject: str, sender: str) -> bool:
 
 
 def fetch_newsletters(
-    service, days: int = 7, max_results: int = 100, verbose: bool = False
+    service, days: int = 7, max_results: int = 150, verbose: bool = False
 ) -> list[NewsletterEmail]:
     since = datetime.now(timezone.utc) - timedelta(days=days)
     after_ts = int(since.timestamp())
