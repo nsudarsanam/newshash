@@ -54,7 +54,7 @@ def _decode_body(part) -> str:
 
 
 def _extract_links_from_html(html: str) -> list[dict]:
-    soup = BeautifulSoup(html, "lxml")
+    soup = BeautifulSoup(html, "html.parser")
     links = []
     seen = set()
 
