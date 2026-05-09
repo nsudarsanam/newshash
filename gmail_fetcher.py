@@ -23,14 +23,17 @@ NEWSLETTER_INDICATORS = [
     "digest",
 ]
 
-# URL patterns to skip (tracking pixels, unsubscribe links, social icons, etc.)
+# URL patterns to skip (unsubscribe pages, mailto/tel, pure social homepages, share dialogs)
+# NOTE: Keep this list narrow — over-filtering kills entire newsletters.
+# Many newsletters (ConvertKit, Beehiiv, etc.) wrap ALL links in tracking redirects,
+# so filtering on click./open./track. subdomains drops every link from those senders.
+# utm_ params are just analytics on normal article URLs; we already strip query strings
+# during deduplication, so there's no reason to drop the URL itself.
 SKIP_URL_PATTERNS = re.compile(
-    r"(unsubscribe|optout|opt-out|click\.|track\.|open\.|beacon\.|pixel\.|"
-    r"mailto:|tel:|#|utm_|list-manage|mandrillapp|sendgrid|mailchimp|"
-    r"constantcontact|campaignmonitor|klaviyo|hubspot|marketo|salesforce"
-    r"|facebook\.com/sharer|twitter\.com/intent|linkedin\.com/share"
-    r"|instagram\.com$|youtube\.com$|twitter\.com$|facebook\.com$"
-    r"|t\.co/|bit\.ly/|ow\.ly/)",
+    r"(unsubscribe|optout|opt-out|mailto:|tel:|"
+    r"list-manage\.com|mandrillapp\.com|"
+    r"facebook\.com/sharer|twitter\.com/intent|linkedin\.com/share"
+    r"|instagram\.com/?$|twitter\.com/?$|facebook\.com/?$|youtube\.com/?$)",
     re.IGNORECASE,
 )
 
@@ -124,7 +127,9 @@ def _is_newsletter(headers: dict) -> bool:
     return any(ind in header_block for ind in NEWSLETTER_INDICATORS)
 
 
-def fetch_newsletters(service, days: int = 7, max_results: int = 50) -> list[NewsletterEmail]:
+def fetch_newsletters(
+    service, days: int = 7, max_results: int = 100, verbose: bool = False
+) -> list[NewsletterEmail]:
     since = datetime.now(timezone.utc) - timedelta(days=days)
     after_ts = int(since.timestamp())
     query = f"after:{after_ts} -from:me"
@@ -137,6 +142,9 @@ def fetch_newsletters(service, days: int = 7, max_results: int = 50) -> list[New
         raise RuntimeError(f"Gmail API error: {e}") from e
 
     message_ids = [m["id"] for m in response.get("messages", [])]
+    if verbose:
+        print(f"[debug] {len(message_ids)} emails found in last {days} days")
+
     newsletters = []
 
     for msg_id in message_ids:
@@ -151,18 +159,20 @@ def fetch_newsletters(service, days: int = 7, max_results: int = 50) -> list[New
         raw_headers = payload.get("headers", [])
         headers = {h["name"].lower(): h["value"] for h in raw_headers}
 
-        if not _is_newsletter(headers):
-            continue
-
         subject = headers.get("subject", "(no subject)")
         sender = headers.get("from", "unknown")
-        date_str = headers.get("date", "")
 
+        if not _is_newsletter(headers):
+            if verbose:
+                print(f"[debug] SKIP (not newsletter): {subject!r} from {sender!r}")
+            continue
+
+        date_str = headers.get("date", "")
         try:
             from email.utils import parsedate_to_datetime
             date = parsedate_to_datetime(date_str).astimezone(timezone.utc)
         except Exception:
-            date = since  # fallback
+            date = since
 
         html_bodies, text_bodies = [], []
         parts = payload.get("parts", [])
@@ -181,7 +191,12 @@ def fetch_newsletters(service, days: int = 7, max_results: int = 50) -> list[New
             links = _extract_links_from_text("\n".join(text_bodies))
 
         if not links:
+            if verbose:
+                print(f"[debug] SKIP (no links extracted): {subject!r}")
             continue
+
+        if verbose:
+            print(f"[debug] ACCEPT ({len(links)} links): {subject!r}")
 
         newsletters.append(NewsletterEmail(
             message_id=msg_id,
