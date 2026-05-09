@@ -2,69 +2,23 @@
 """Gmail Newsletter Link Summarizer — finds interesting links from the past 7 days."""
 
 import sys
-from datetime import datetime, timezone
+import webbrowser
+from pathlib import Path
 
 from dotenv import load_dotenv
 from rich.console import Console
 from rich.panel import Panel
-from rich.rule import Rule
-from rich.table import Table
-from rich import box
 
 load_dotenv()
 
 console = Console()
 
 
-def _print_header(newsletter_count: int, days: int):
-    console.print()
-    console.print(Panel.fit(
-        f"[bold cyan]Newsletter Link Digest[/bold cyan]\n"
-        f"[dim]Last {days} days · {newsletter_count} newsletters scanned[/dim]",
-        border_style="cyan",
-    ))
-    console.print()
-
-
-def _print_category(category: dict, index: int):
-    name = category.get("name", "Misc")
-    links = category.get("links", [])
-    if not links:
-        return
-
-    console.print(Rule(f"[bold yellow]{name}[/bold yellow] [dim]({len(links)} links)[/dim]"))
-    console.print()
-
-    for link in links:
-        title = link.get("title") or link.get("url", "")
-        desc = link.get("description", "")
-        url = link.get("url", "")
-        source = link.get("source", "")
-
-        console.print(f"  [bold white]{title}[/bold white]")
-        if desc:
-            console.print(f"  [dim]{desc}[/dim]")
-        console.print(f"  [blue underline]{url}[/blue underline]")
-        if source:
-            console.print(f"  [dim italic]via {source}[/dim italic]")
-        console.print()
-
-
-def _print_summary(result: dict):
-    kept = result.get("total_interesting", 0)
-    skipped = result.get("total_skipped", 0)
-    console.print(Rule())
-    console.print(
-        f"[dim]Showing [bold]{kept}[/bold] interesting links "
-        f"({skipped} filtered out)[/dim]"
-    )
-    console.print()
-
-
 def run(days: int = 7, max_emails: int = 50):
     from auth import get_gmail_service
     from gmail_fetcher import fetch_newsletters
     from summarizer import summarize_newsletters
+    from html_report import generate_html
 
     console.print("[dim]Authenticating with Gmail...[/dim]")
     try:
@@ -97,10 +51,21 @@ def run(days: int = 7, max_emails: int = 50):
         console.print("[yellow]No interesting links found this week.[/yellow]")
         sys.exit(0)
 
-    _print_header(len(newsletters), days)
-    for i, cat in enumerate(categories):
-        _print_category(cat, i)
-    _print_summary(result)
+    html = generate_html(result, newsletter_count=len(newsletters), days=days)
+
+    output_path = Path("digest.html")
+    output_path.write_text(html, encoding="utf-8")
+
+    console.print()
+    console.print(Panel.fit(
+        f"[bold green]Done![/bold green] "
+        f"[bold]{result.get('total_interesting', 0)}[/bold] interesting links "
+        f"across [bold]{len(categories)}[/bold] categories.\n"
+        f"[dim]Saved to [cyan]{output_path.resolve()}[/cyan][/dim]",
+        border_style="green",
+    ))
+
+    webbrowser.open(output_path.resolve().as_uri())
 
 
 if __name__ == "__main__":
