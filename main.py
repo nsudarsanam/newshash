@@ -83,13 +83,13 @@ def run(days: int = 7, max_emails: int = 50):
     total_links = sum(len(nl.links) for nl in newsletters)
     console.print(
         f"[dim]Found [bold]{len(newsletters)}[/bold] newsletters with "
-        f"[bold]{total_links}[/bold] links. Analyzing with Claude...[/dim]"
+        f"[bold]{total_links}[/bold] links. Analyzing with Gemini...[/dim]"
     )
 
     result = summarize_newsletters(newsletters)
 
     if "error" in result:
-        console.print(f"[red]Claude returned an unexpected response:[/red] {result['error']}")
+        console.print(f"[red]Gemini returned an unexpected response:[/red] {result['error']}")
         sys.exit(1)
 
     categories = result.get("categories", [])
