@@ -33,7 +33,8 @@ Return a JSON object with this structure:
           "url": "https://...",
           "title": "Human-readable title",
           "description": "What this is about in 1-2 sentences",
-          "source": "Newsletter name that contained this"
+          "source": "Newsletter name that contained this",
+          "message_id": "the message_id value from the input"
         }
       ]
     }
@@ -52,6 +53,7 @@ def _build_links_payload(newsletters: list[NewsletterEmail]) -> str:
                 "anchor_text": link["anchor_text"] or "(no text)",
                 "source": nl.subject,
                 "sender": nl.sender,
+                "message_id": nl.message_id,
             })
     return json.dumps(items, indent=2)
 
