@@ -67,16 +67,43 @@ def _build_links_payload(newsletters: list[NewsletterEmail]) -> str:
     return json.dumps(items, indent=2)
 
 
-def summarize_newsletters(newsletters: list[NewsletterEmail]) -> dict:
-    if not newsletters:
-        return {"categories": [], "total_interesting": 0, "total_skipped": 0}
+def _build_pinned_sections(pinned: list[NewsletterEmail]) -> list[dict]:
+    sections = []
+    for nl in pinned:
+        sections.append({
+            "subject": nl.subject,
+            "sender": nl.sender,
+            "message_id": nl.message_id,
+            "date": nl.date.strftime("%B %d, %Y"),
+            "links": [
+                {
+                    "url": link["url"],
+                    "title": link["anchor_text"] or link["url"],
+                    "source": nl.subject,
+                    "message_id": nl.message_id,
+                }
+                for link in nl.links
+            ],
+        })
+    return sections
 
-    payload = _build_links_payload(newsletters)
-    total_links = sum(len(nl.links) for nl in newsletters)
+
+def summarize_newsletters(newsletters: list[NewsletterEmail]) -> dict:
+    pinned = [nl for nl in newsletters if nl.is_pinned]
+    regular = [nl for nl in newsletters if not nl.is_pinned]
+
+    result: dict = {"pinned_newsletters": _build_pinned_sections(pinned)}
+
+    if not regular:
+        result.update({"categories": [], "total_interesting": 0, "total_skipped": 0})
+        return result
+
+    payload = _build_links_payload(regular)
+    total_links = sum(len(nl.links) for nl in regular)
 
     prompt = f"""{SYSTEM_PROMPT}
 
-Here are {total_links} links extracted from {len(newsletters)} newsletter emails received in the past 7 days.
+Here are {total_links} links extracted from {len(regular)} newsletter emails received in the past 7 days.
 
 Please identify the interesting ones, group them into categories, and return your analysis as JSON.
 
@@ -92,9 +119,13 @@ Links:
         text = "\n".join(lines[1:-1] if lines[-1].startswith("```") else lines[1:])
 
     try:
-        return json.loads(text)
+        gemini_result = json.loads(text)
     except json.JSONDecodeError:
         match = re.search(r'\{.*\}', text, re.DOTALL)
         if match:
-            return json.loads(match.group())
-        return {"categories": [], "total_interesting": 0, "total_skipped": 0, "error": text[:200]}
+            gemini_result = json.loads(match.group())
+        else:
+            gemini_result = {"categories": [], "total_interesting": 0, "total_skipped": 0, "error": text[:200]}
+
+    result.update(gemini_result)
+    return result

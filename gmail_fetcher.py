@@ -1,12 +1,14 @@
 """Fetch newsletter emails from Gmail and extract links."""
 
 import base64
+import json
 import os
 import re
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from email import message_from_bytes
+from pathlib import Path
 from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
@@ -51,6 +53,9 @@ EXCLUDED_KEYWORDS = [
 ]
 
 
+PINNED_WINDOW_DAYS = 14
+
+
 @dataclass
 class NewsletterEmail:
     message_id: str
@@ -58,6 +63,28 @@ class NewsletterEmail:
     sender: str
     date: datetime
     links: list[dict] = field(default_factory=list)  # [{url, anchor_text}]
+    is_pinned: bool = False
+
+
+def load_pinned_patterns(config_path: str | None = None) -> list[str]:
+    """Load pinned newsletter patterns from a JSON file (list of strings)."""
+    path = Path(config_path) if config_path else Path(__file__).parent / "pinned_newsletters.json"
+    if not path.exists():
+        return []
+    try:
+        data = json.loads(path.read_text())
+        if isinstance(data, list):
+            return [p.lower() for p in data if isinstance(p, str)]
+    except Exception:
+        pass
+    return []
+
+
+def _is_pinned(subject: str, sender: str, patterns: list[str]) -> bool:
+    if not patterns:
+        return False
+    combined = (subject + " " + sender).lower()
+    return any(p in combined for p in patterns)
 
 
 def _decode_body(part) -> str:
@@ -144,9 +171,18 @@ def _is_excluded(subject: str, sender: str) -> bool:
 
 
 def fetch_newsletters(
-    service, days: int = 7, max_results: int = 150, verbose: bool = False
+    service, days: int = 7, max_results: int = 150, verbose: bool = False,
+    pinned_patterns: list[str] | None = None,
 ) -> list[NewsletterEmail]:
-    since = datetime.now(timezone.utc) - timedelta(days=days)
+    pinned_patterns = pinned_patterns or []
+
+    # If pinned patterns exist, fetch far enough back to cover the pinned window
+    fetch_days = max(days, PINNED_WINDOW_DAYS) if pinned_patterns else days
+    now = datetime.now(timezone.utc)
+    regular_since = now - timedelta(days=days)
+    pinned_since = now - timedelta(days=PINNED_WINDOW_DAYS)
+
+    since = now - timedelta(days=fetch_days)
     after_ts = int(since.timestamp())
     query = f"in:inbox -category:promotions after:{after_ts} -from:me"
 
@@ -195,6 +231,18 @@ def fetch_newsletters(
         except Exception:
             date = since
 
+        pinned = _is_pinned(subject, sender, pinned_patterns)
+
+        # Time-window filtering: pinned newsletters use a 14-day window; others use --days
+        if pinned and date < pinned_since:
+            if verbose:
+                print(f"[debug] SKIP pinned (older than {PINNED_WINDOW_DAYS} days): {subject!r}")
+            continue
+        if not pinned and date < regular_since:
+            if verbose:
+                print(f"[debug] SKIP (outside {days}-day window): {subject!r}")
+            continue
+
         html_bodies, text_bodies = [], []
         parts = payload.get("parts", [])
         if parts:
@@ -217,7 +265,8 @@ def fetch_newsletters(
             continue
 
         if verbose:
-            print(f"[debug] ACCEPT ({len(links)} links): {subject!r}")
+            pin_tag = " [PINNED]" if pinned else ""
+            print(f"[debug] ACCEPT ({len(links)} links){pin_tag}: {subject!r}")
 
         newsletters.append(NewsletterEmail(
             message_id=msg_id,
@@ -225,6 +274,7 @@ def fetch_newsletters(
             sender=sender,
             date=date,
             links=links,
+            is_pinned=pinned,
         ))
 
         # Gentle rate limiting
