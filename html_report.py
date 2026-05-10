@@ -1,42 +1,24 @@
 """Generate a nicely formatted HTML digest from the summarized newsletter links."""
 
+import re
 from datetime import datetime, timezone
 
 
-def generate_html(result: dict, newsletter_count: int, days: int) -> str:
-    categories = result.get("categories", [])
-    total_interesting = result.get("total_interesting", 0)
-    total_skipped = result.get("total_skipped", 0)
-    generated_at = datetime.now(timezone.utc).strftime("%B %d, %Y")
+def _render_card(link: dict, show_source: bool = True) -> str:
+    title = _esc(link.get("title") or link.get("url", ""))
+    desc = _esc(link.get("description", ""))
+    url = _esc(link.get("url", ""))
+    source = _esc(link.get("source", "")) if show_source else ""
+    domain = _domain(link.get("url", ""))
+    message_id = link.get("message_id", "")
+    gmail_url = f"https://mail.google.com/mail/mu/mp/0/#cv/priority/%5Eu/{message_id}" if message_id else ""
 
-    category_nav = "\n".join(
-        f'<a href="#cat-{i}">{cat["name"]}</a>'
-        for i, cat in enumerate(categories)
-        if cat.get("links")
+    email_link = (
+        f'<a class="email-link" href="{gmail_url}" data-msgid="{message_id}" title="Open original email">&#9993; view email</a>'
+        if gmail_url else ""
     )
 
-    category_sections = ""
-    for i, cat in enumerate(categories):
-        links = cat.get("links", [])
-        if not links:
-            continue
-
-        cards = ""
-        for link in links:
-            title = _esc(link.get("title") or link.get("url", ""))
-            desc = _esc(link.get("description", ""))
-            url = _esc(link.get("url", ""))
-            source = _esc(link.get("source", ""))
-            domain = _domain(link.get("url", ""))
-            message_id = link.get("message_id", "")
-            gmail_url = f"https://mail.google.com/mail/mu/mp/0/#cv/priority/%5Eu/{message_id}" if message_id else ""
-
-            email_link = (
-                f'<a class="email-link" href="{gmail_url}" data-msgid="{message_id}" title="Open original email">✉ view email</a>'
-                if gmail_url else ""
-            )
-
-            cards += f"""
+    return f"""
             <article class="card">
                 <div class="card-meta">
                     <span class="domain">{domain}</span>
@@ -49,6 +31,52 @@ def generate_html(result: dict, newsletter_count: int, days: int) -> str:
                 {"<p class='card-desc'>" + desc + "</p>" if desc else ""}
             </article>"""
 
+
+def generate_html(result: dict, newsletter_count: int, days: int) -> str:
+    categories = result.get("categories", [])
+    pinned_newsletters = result.get("pinned_newsletters", [])
+    total_interesting = result.get("total_interesting", 0)
+    total_skipped = result.get("total_skipped", 0)
+    generated_at = datetime.now(timezone.utc).strftime("%B %d, %Y")
+
+    nav_links = []
+    for pnl in pinned_newsletters:
+        if pnl.get("links"):
+            slug = _slug(pnl["subject"])
+            nav_links.append(f'<a href="#pinned-{slug}" class="pinned-nav">{_esc(pnl["subject"])}</a>')
+    for i, cat in enumerate(categories):
+        if cat.get("links"):
+            nav_links.append(f'<a href="#cat-{i}">{cat["name"]}</a>')
+    category_nav = "\n".join(nav_links)
+
+    # Pinned newsletter sections
+    pinned_sections = ""
+    for pnl in pinned_newsletters:
+        links = pnl.get("links", [])
+        if not links:
+            continue
+        slug = _slug(pnl["subject"])
+        cards = "".join(_render_card(link, show_source=False) for link in links)
+        pinned_sections += f"""
+        <section class="category pinned-section" id="pinned-{slug}">
+            <h2 class="category-title">
+                <span class="pinned-badge">Pinned</span>
+                <span class="category-name">{_esc(pnl["subject"])}</span>
+                <span class="category-count">{len(links)}</span>
+                <span class="pinned-date">{_esc(pnl.get("date", ""))}</span>
+            </h2>
+            <div class="cards">{cards}
+            </div>
+        </section>"""
+
+    category_sections = ""
+    for i, cat in enumerate(categories):
+        links = cat.get("links", [])
+        if not links:
+            continue
+
+        cards = "".join(_render_card(link) for link in links)
+
         category_sections += f"""
         <section class="category" id="cat-{i}">
             <h2 class="category-title">
@@ -58,6 +86,12 @@ def generate_html(result: dict, newsletter_count: int, days: int) -> str:
             <div class="cards">{cards}
             </div>
         </section>"""
+
+    pinned_link_count = sum(len(pnl.get("links", [])) for pnl in pinned_newsletters)
+    pinned_stat = (
+        f'<span class="stat"><strong>{pinned_link_count}</strong> pinned links</span>'
+        if pinned_newsletters else ""
+    )
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -273,6 +307,43 @@ def generate_html(result: dict, newsletter_count: int, days: int) -> str:
 
         .email-link:hover {{ color: var(--accent); }}
 
+        /* Pinned newsletter sections */
+        .pinned-section {{
+            border: 1px solid #4a3f6b;
+            border-radius: 12px;
+            padding: 20px 20px 8px;
+            background: #16142280;
+        }}
+
+        .pinned-badge {{
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #c084fc;
+            background: #2d1d4e;
+            border: 1px solid #6d28d9;
+            padding: 2px 8px;
+            border-radius: 6px;
+        }}
+
+        .pinned-date {{
+            margin-left: auto;
+            font-size: 11px;
+            color: var(--text-faint);
+            font-weight: 400;
+            text-transform: none;
+            letter-spacing: 0;
+        }}
+
+        nav a.pinned-nav {{
+            color: #c084fc;
+        }}
+
+        nav a.pinned-nav:hover {{
+            border-bottom-color: #c084fc;
+        }}
+
         /* Footer */
         footer {{
             text-align: center;
@@ -310,12 +381,13 @@ def generate_html(result: dict, newsletter_count: int, days: int) -> str:
             <span class="stat"><strong>{newsletter_count}</strong> newsletters</span>
             <span class="stat"><strong>{total_interesting}</strong> interesting links</span>
             <span class="stat"><strong>{total_skipped}</strong> filtered out</span>
+            {pinned_stat}
         </div>
     </header>
 
     <nav>{category_nav}</nav>
 
-    <main>{category_sections}
+    <main>{pinned_sections}{category_sections}
     </main>
 
     <footer>Generated from your Gmail inbox &nbsp;·&nbsp; {generated_at}</footer>
@@ -346,6 +418,10 @@ def generate_html(result: dict, newsletter_count: int, days: int) -> str:
     </script>
 </body>
 </html>"""
+
+
+def _slug(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
 
 
 def _esc(text: str) -> str:
