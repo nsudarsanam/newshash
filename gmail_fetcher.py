@@ -1,5 +1,7 @@
 """Fetch newsletter emails from Gmail and extract links."""
 
+from __future__ import annotations
+
 import base64
 import json
 import os
