@@ -74,9 +74,13 @@ _OPAQUE_URL_RE = re.compile(
 
 
 def _is_useful_pinned_link(url: str, anchor: str) -> bool:
+    # Skip links whose anchor text is a known action/navigation phrase
     if anchor and _SKIP_ANCHOR_RE.match(anchor):
         return False
-    if _OPAQUE_URL_RE.search(url):
+    # Only drop opaque-token URLs when there is no anchor text at all — otherwise
+    # the anchor text (e.g. "What to look out for at the Venice Biennale") is the
+    # signal, not the URL, and we should keep the link.
+    if not anchor.strip() and _OPAQUE_URL_RE.search(url):
         return False
     return True
 
