@@ -29,7 +29,7 @@ def generate_html(result: dict, newsletter_count: int, days: int) -> str:
             source = _esc(link.get("source", ""))
             domain = _domain(link.get("url", ""))
             message_id = link.get("message_id", "")
-            gmail_url = f"https://mail.google.com/mail/u/0/#inbox/{message_id}" if message_id else ""
+            gmail_url = f"https://mail.google.com/mail/mu/mp/0/#cv/priority/%5Eu/{message_id}" if message_id else ""
 
             email_link = (
                 f'<a class="email-link" href="{gmail_url}" data-msgid="{message_id}" title="Open original email">✉ view email</a>'
@@ -321,10 +321,9 @@ def generate_html(result: dict, newsletter_count: int, days: int) -> str:
     <footer>Generated from your Gmail inbox &nbsp;·&nbsp; {generated_at}</footer>
 
     <script>
-    // On iOS, Universal Links don't fire on URLs with # fragments, so we intercept
-    // email-link clicks and try the Gmail app scheme with the hash URL-encoded.
-    // If the app isn't installed the scheme will fail silently, and after a short
-    // timeout we fall back to opening the web URL.
+    // Gmail mobile URL: /mail/mu/mp/0/#cv/priority/%5Eu/{id}
+    // Universal Links don't fire on # fragments, so on iOS we try the googlegmail://
+    // scheme with the mobile path (# encoded as %23), then fall back to mobile web URL.
     (function () {{
         var isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
         if (!isIOS) return;
@@ -333,9 +332,8 @@ def generate_html(result: dict, newsletter_count: int, days: int) -> str:
             a.addEventListener('click', function (e) {{
                 e.preventDefault();
                 var msgId = this.dataset.msgid;
-                var webUrl = 'https://mail.google.com/mail/u/0/#inbox/' + msgId;
-                // %23 encodes # so the Gmail app receives it as part of the path
-                var appUrl = 'googlegmail:///mail/u/0/%23inbox/' + msgId;
+                var webUrl = 'https://mail.google.com/mail/mu/mp/0/#cv/priority/%5Eu/' + msgId;
+                var appUrl = 'googlegmail:///mail/mu/mp/0/%23cv/priority/%5Eu/' + msgId;
 
                 var fallback = setTimeout(function () {{
                     window.location.href = webUrl;
