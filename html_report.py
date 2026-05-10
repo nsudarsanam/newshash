@@ -323,11 +323,6 @@ def generate_html(result: dict, newsletter_count: int, days: int) -> str:
 </html>"""
 
 
-def generate_pdf(html: str) -> bytes:
-    from weasyprint import HTML
-    return HTML(string=html).write_pdf()
-
-
 def _esc(text: str) -> str:
     return (
         text.replace("&", "&amp;")
