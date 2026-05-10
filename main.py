@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Gmail Newsletter Link Summarizer — finds interesting links from the past 7 days."""
 
+from __future__ import annotations
+
 import sys
 import webbrowser
 from pathlib import Path
