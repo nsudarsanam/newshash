@@ -29,10 +29,10 @@ def generate_html(result: dict, newsletter_count: int, days: int) -> str:
             source = _esc(link.get("source", ""))
             domain = _domain(link.get("url", ""))
             message_id = link.get("message_id", "")
-            gmail_url = f"https://mail.google.com/mail/u/0/#inbox/{message_id}" if message_id else ""
+            gmail_url = f"googlegmail:///mail/u/0/#inbox/{message_id}" if message_id else ""
 
             email_link = (
-                f'<a class="email-link" href="{gmail_url}" target="_blank" rel="noopener" title="Open original email">✉ view email</a>'
+                f'<a class="email-link" href="{gmail_url}" title="Open original email">✉ view email</a>'
                 if gmail_url else ""
             )
 
