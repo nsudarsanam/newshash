@@ -47,6 +47,7 @@ EXCLUDED_KEYWORDS = [
     "prisoner news",
     "oakland y ",       # Oakland YMCA / Oakland Y newsletters
     "ymca of",
+    "summary"
 ]
 
 
