@@ -32,7 +32,7 @@ def generate_html(result: dict, newsletter_count: int, days: int) -> str:
             gmail_url = f"https://mail.google.com/mail/u/0/#inbox/{message_id}" if message_id else ""
 
             email_link = (
-                f'<a class="email-link" href="{gmail_url}" title="Open original email">✉ view email</a>'
+                f'<a class="email-link" href="{gmail_url}" data-msgid="{message_id}" title="Open original email">✉ view email</a>'
                 if gmail_url else ""
             )
 
@@ -319,6 +319,33 @@ def generate_html(result: dict, newsletter_count: int, days: int) -> str:
     </main>
 
     <footer>Generated from your Gmail inbox &nbsp;·&nbsp; {generated_at}</footer>
+
+    <script>
+    // On iOS, Universal Links don't fire on URLs with # fragments, so we intercept
+    // email-link clicks and try the Gmail app scheme with the hash URL-encoded.
+    // If the app isn't installed the scheme will fail silently, and after a short
+    // timeout we fall back to opening the web URL.
+    (function () {{
+        var isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+        if (!isIOS) return;
+
+        document.querySelectorAll('a.email-link[data-msgid]').forEach(function (a) {{
+            a.addEventListener('click', function (e) {{
+                e.preventDefault();
+                var msgId = this.dataset.msgid;
+                var webUrl = 'https://mail.google.com/mail/u/0/#inbox/' + msgId;
+                // %23 encodes # so the Gmail app receives it as part of the path
+                var appUrl = 'googlegmail:///mail/u/0/%23inbox/' + msgId;
+
+                var fallback = setTimeout(function () {{
+                    window.location.href = webUrl;
+                }}, 1500);
+
+                window.location.href = appUrl;
+            }});
+        }});
+    }})();
+    </script>
 </body>
 </html>"""
 
