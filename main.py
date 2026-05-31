@@ -20,7 +20,7 @@ load_dotenv()
 console = Console()
 
 
-def run(days: int = 7, max_emails: int = 150, verbose: bool = False, pinned_config: str | None = None):
+def run(days: int = 10, max_emails: int = 150, verbose: bool = False, pinned_config: str | None = None):
     from auth import get_gmail_service
     from gmail_fetcher import fetch_newsletters, load_pinned_patterns
     from summarizer import summarize_newsletters
