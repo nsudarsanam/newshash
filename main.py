@@ -121,8 +121,8 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Summarize newsletter links from Gmail")
-    parser.add_argument("--days", type=int, default=7, help="How many days back to look (default: 7)")
-    parser.add_argument("--max-emails", type=int, default=150, help="Max emails to scan (default: 150)")
+    parser.add_argument("--days", type=int, default=10, help="How many days back to look (default: 10)")
+    parser.add_argument("--max-emails", type=int, default=200, help="Max emails to scan (default: 200)")
     parser.add_argument("--verbose", action="store_true", help="Show which emails are accepted/skipped")
     parser.add_argument(
         "--pinned-config", default=None,
