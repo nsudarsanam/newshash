@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Gmail Newsletter Link Summarizer — finds interesting links from the past 7 days."""
+"""Gmail Newsletter Link Summarizer — finds interesting links from the past 10 days."""
 
 from __future__ import annotations
 
