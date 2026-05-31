@@ -3,6 +3,10 @@
 
 from __future__ import annotations
 
+import base64
+import email.mime.application
+import email.mime.multipart
+import email.mime.text
 import sys
 import webbrowser
 from pathlib import Path
@@ -83,6 +87,34 @@ def run(days: int = 7, max_emails: int = 150, verbose: bool = False, pinned_conf
     ))
 
     webbrowser.open(html_path.resolve().as_uri())
+
+    _send_digest_email(service, html, html_path)
+
+
+def _send_digest_email(service, html: str, html_path: Path):
+    profile = service.users().getProfile(userId="me").execute()
+    recipient = profile.get("emailAddress", "")
+    if not recipient:
+        console.print("[yellow]Could not determine Gmail address; skipping email delivery.[/yellow]")
+        return
+
+    msg = email.mime.multipart.MIMEMultipart()
+    msg["To"] = recipient
+    msg["From"] = recipient
+    msg["Subject"] = "Summary"
+
+    attachment = email.mime.application.MIMEApplication(
+        html.encode("utf-8"), _subtype="octet-stream"
+    )
+    attachment.add_header(
+        "Content-Disposition", "attachment", filename=html_path.name
+    )
+    msg.attach(attachment)
+
+    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode("utf-8")
+    service.users().messages().send(userId="me", body={"raw": raw}).execute()
+
+    console.print(f"[dim]Digest emailed to [cyan]{recipient}[/cyan].[/dim]")
 
 
 if __name__ == "__main__":
