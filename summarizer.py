@@ -53,38 +53,6 @@ Return a JSON object with this structure:
 }"""
 
 
-# Anchor texts that indicate action/navigation links rather than content
-_SKIP_ANCHOR_RE = re.compile(
-    r"^\s*(subscribe(\s+(here|now))?|unsubscribe|"
-    r"view\s+(in\s+browser|online|this\s+email(\s+online)?|in\s+your\s+browser)|"
-    r"click\s+here|read\s+more|"
-    r"manage\s+(preferences|subscription|your\s+subscription)|"
-    r"update\s+(your\s+)?preferences|email\s+preferences|"
-    r"forward(\s+to\s+a\s+friend)?|share|tweet(\s+this)?|"
-    r"privacy\s+policy|terms(\s+of\s+(service|use))?|"
-    r"opt\s*out|opt-out|follow\s+us|"
-    r"having\s+trouble|can'?t\s+see|display\s+images)\s*$",
-    re.IGNORECASE,
-)
-
-# URLs where the path or query contains an opaque JWT/base64 token with no semantic value
-_OPAQUE_URL_RE = re.compile(
-    r"(?:/eyJ[A-Za-z0-9_=.-]{15,}|[?&]j=eyJ[A-Za-z0-9_=.-]{15,})",
-)
-
-
-def _is_useful_pinned_link(url: str, anchor: str) -> bool:
-    # Skip links whose anchor text is a known action/navigation phrase
-    if anchor and _SKIP_ANCHOR_RE.match(anchor):
-        return False
-    # Only drop opaque-token URLs when there is no anchor text at all — otherwise
-    # the anchor text (e.g. "What to look out for at the Venice Biennale") is the
-    # signal, not the URL, and we should keep the link.
-    if not anchor.strip() and _OPAQUE_URL_RE.search(url):
-        return False
-    return True
-
-
 def _build_links_payload(newsletters: list[NewsletterEmail]) -> str:
     items = []
     for nl in newsletters:
@@ -100,25 +68,16 @@ def _build_links_payload(newsletters: list[NewsletterEmail]) -> str:
 
 
 def _build_pinned_sections(pinned: list[NewsletterEmail]) -> list[dict]:
-    sections = []
-    for nl in pinned:
-        sections.append({
+    # Pinned newsletters just link back to the original email — no link extraction
+    return [
+        {
             "subject": nl.subject,
             "sender": nl.sender,
             "message_id": nl.message_id,
             "date": nl.date.strftime("%B %d, %Y"),
-            "links": [
-                {
-                    "url": link["url"],
-                    "title": link["anchor_text"] or link["url"],
-                    "source": nl.subject,
-                    "message_id": nl.message_id,
-                }
-                for link in nl.links
-                if _is_useful_pinned_link(link["url"], link["anchor_text"])
-            ],
-        })
-    return sections
+        }
+        for nl in pinned
+    ]
 
 
 def summarize_newsletters(newsletters: list[NewsletterEmail]) -> dict:

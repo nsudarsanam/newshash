@@ -41,31 +41,35 @@ def generate_html(result: dict, newsletter_count: int, days: int) -> str:
 
     nav_links = []
     for pnl in pinned_newsletters:
-        if pnl.get("links"):
-            slug = _slug(pnl["subject"])
-            nav_links.append(f'<a href="#pinned-{slug}" class="pinned-nav">{_esc(pnl["subject"])}</a>')
+        slug = _slug(pnl["subject"])
+        nav_links.append(f'<a href="#pinned-{slug}" class="pinned-nav">{_esc(pnl["subject"])}</a>')
     for i, cat in enumerate(categories):
         if cat.get("links"):
             nav_links.append(f'<a href="#cat-{i}">{cat["name"]}</a>')
     category_nav = "\n".join(nav_links)
 
-    # Pinned newsletter sections
+    # Pinned newsletter sections: a single link to the original email each
     pinned_sections = ""
     for pnl in pinned_newsletters:
-        links = pnl.get("links", [])
-        if not links:
-            continue
         slug = _slug(pnl["subject"])
-        cards = "".join(_render_card(link, show_source=False) for link in links)
+        message_id = pnl.get("message_id", "")
+        gmail_url = f"https://mail.google.com/mail/mu/mp/0/#cv/priority/%5Eu/{message_id}" if message_id else ""
         pinned_sections += f"""
         <section class="category pinned-section" id="pinned-{slug}">
             <h2 class="category-title">
                 <span class="pinned-badge">Pinned</span>
                 <span class="category-name">{_esc(pnl["subject"])}</span>
-                <span class="category-count">{len(links)}</span>
                 <span class="pinned-date">{_esc(pnl.get("date", ""))}</span>
             </h2>
-            <div class="cards">{cards}
+            <div class="cards">
+            <article class="card">
+                <div class="card-meta">
+                    <span class="source">{_esc(pnl.get("sender", ""))}</span>
+                </div>
+                <h3 class="card-title">
+                    <a href="{gmail_url}" data-msgid="{message_id}" title="Open original email">&#9993; Open email in Gmail</a>
+                </h3>
+            </article>
             </div>
         </section>"""
 
@@ -87,9 +91,8 @@ def generate_html(result: dict, newsletter_count: int, days: int) -> str:
             </div>
         </section>"""
 
-    pinned_link_count = sum(len(pnl.get("links", [])) for pnl in pinned_newsletters)
     pinned_stat = (
-        f'<span class="stat"><strong>{pinned_link_count}</strong> pinned links</span>'
+        f'<span class="stat"><strong>{len(pinned_newsletters)}</strong> pinned</span>'
         if pinned_newsletters else ""
     )
 
@@ -400,7 +403,7 @@ def generate_html(result: dict, newsletter_count: int, days: int) -> str:
         var isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
         if (!isIOS) return;
 
-        document.querySelectorAll('a.email-link[data-msgid]').forEach(function (a) {{
+        document.querySelectorAll('a[data-msgid]').forEach(function (a) {{
             a.addEventListener('click', function (e) {{
                 e.preventDefault();
                 var msgId = this.dataset.msgid;
