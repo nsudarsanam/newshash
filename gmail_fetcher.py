@@ -245,30 +245,33 @@ def fetch_newsletters(
                 print(f"[debug] SKIP (outside {days}-day window): {subject!r}")
             continue
 
-        html_bodies, text_bodies = [], []
-        parts = payload.get("parts", [])
-        if parts:
-            _parse_parts(parts, html_bodies, text_bodies)
-        else:
-            mime = payload.get("mimeType", "")
-            if mime == "text/html":
-                html_bodies.append(_decode_body(payload))
+        # Pinned newsletters just link back to the original email, so no link extraction
+        links = []
+        if not pinned:
+            html_bodies, text_bodies = [], []
+            parts = payload.get("parts", [])
+            if parts:
+                _parse_parts(parts, html_bodies, text_bodies)
             else:
-                text_bodies.append(_decode_body(payload))
+                mime = payload.get("mimeType", "")
+                if mime == "text/html":
+                    html_bodies.append(_decode_body(payload))
+                else:
+                    text_bodies.append(_decode_body(payload))
 
-        if html_bodies:
-            links = _extract_links_from_html("\n".join(html_bodies))
-        else:
-            links = _extract_links_from_text("\n".join(text_bodies))
+            if html_bodies:
+                links = _extract_links_from_html("\n".join(html_bodies))
+            else:
+                links = _extract_links_from_text("\n".join(text_bodies))
 
-        if not links:
-            if verbose:
-                print(f"[debug] SKIP (no links extracted): {subject!r}")
-            continue
+            if not links:
+                if verbose:
+                    print(f"[debug] SKIP (no links extracted): {subject!r}")
+                continue
 
         if verbose:
-            pin_tag = " [PINNED]" if pinned else ""
-            print(f"[debug] ACCEPT ({len(links)} links){pin_tag}: {subject!r}")
+            detail = "[PINNED]" if pinned else f"({len(links)} links)"
+            print(f"[debug] ACCEPT {detail}: {subject!r}")
 
         newsletters.append(NewsletterEmail(
             message_id=msg_id,

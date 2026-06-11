@@ -50,14 +50,13 @@ def run(days: int = 10, max_emails: int = 200, verbose: bool = False, pinned_con
     pinned = [nl for nl in newsletters if nl.is_pinned]
     regular = [nl for nl in newsletters if not nl.is_pinned]
     regular_links = sum(len(nl.links) for nl in regular)
-    pinned_links = sum(len(nl.links) for nl in pinned)
 
     msg = (
         f"[dim]Found [bold]{len(newsletters)}[/bold] newsletters "
         f"([bold]{regular_links}[/bold] regular links"
     )
     if pinned:
-        msg += f", [bold]{pinned_links}[/bold] pinned links from [bold]{len(pinned)}[/bold] pinned newsletter(s)"
+        msg += f", [bold]{len(pinned)}[/bold] pinned newsletter(s)"
     msg += "). Analyzing with Gemini...[/dim]"
     console.print(msg)
 
@@ -68,7 +67,7 @@ def run(days: int = 10, max_emails: int = 200, verbose: bool = False, pinned_con
         sys.exit(1)
 
     categories = result.get("categories", [])
-    if not categories:
+    if not categories and not result.get("pinned_newsletters"):
         console.print("[yellow]No interesting links found this week.[/yellow]")
         sys.exit(0)
 
